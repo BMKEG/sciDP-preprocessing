@@ -18,14 +18,12 @@ import org.uimafit.factory.CollectionReaderFactory;
 import org.uimafit.factory.CpeBuilder;
 import org.uimafit.factory.TypeSystemDescriptionFactory;
 
-import edu.isi.bmkeg.sciDP.uima.out.SaveExtractedAnnotations;
 import edu.isi.bmkeg.uimaBioC.uima.ae.FixSentencesFromHeadings;
-import edu.isi.bmkeg.uimaBioC.uima.ae.RemoveSentencesFromOtherSections;
-import edu.isi.bmkeg.uimaBioC.uima.ae.RemoveSentencesNotInTitleAbstractBody;
+import edu.isi.bmkeg.uimaBioC.uima.ae.TagPassagesAnnotator;
 import edu.isi.bmkeg.uimaBioC.uima.readers.BioCCollectionReader;
 import edu.isi.bmkeg.uimaBioC.utils.StatusCallbackListenerImpl;
 
-public class RUBICON_02_BioCToTsv {
+public class SciDP_03_prepareData {
 
 	public static class Options {
 
@@ -38,15 +36,12 @@ public class RUBICON_02_BioCToTsv {
 		@Option(name = "-outDir", usage = "Output Directory", required = true, metaVar = "OUT-FILE")
 		public File outDir;
 
-		@Option(name = "-clauseLevel", usage = "Output Directory", required = false, metaVar = "CLAUSE-LEVEL")
-		public Boolean clauseLevel = false;
-
-		@Option(name = "-ann2Extract", usage = "Annotation Type to Extract", required = false, metaVar = "ANNOTATION")
-		public File ann2Ext;
+		//@Option(name = "-execPath", usage = "Path to the python executable", required = true, metaVar = "PATH")
+		//public String execPath;
 		
 	}
 
-	private static Logger logger = Logger.getLogger(RUBICON_02_BioCToTsv.class);
+	private static Logger logger = Logger.getLogger(SciDP_03_prepareData.class);
 
 	/**
 	 * @param args
@@ -96,48 +91,15 @@ public class RUBICON_02_BioCToTsv {
 		builder.add(AnalysisEngineFactory.createPrimitiveDescription(FixSentencesFromHeadings.class));
 
 		//
-		// Strip out not results sections where we aren't interested in them
+		// Execute Pradeep's Python code. 
 		//
-		if( options.ann2Ext != null ) {
-			builder.add(AnalysisEngineFactory.createPrimitiveDescription(RemoveSentencesFromOtherSections.class,
-					RemoveSentencesFromOtherSections.PARAM_ANNOT_2_EXTRACT, options.ann2Ext,
-					RemoveSentencesFromOtherSections.PARAM_KEEP_FLOATING_BOXES, "false"));
-		} else {
-			builder.add(AnalysisEngineFactory.createPrimitiveDescription(RemoveSentencesNotInTitleAbstractBody.class,
-					RemoveSentencesNotInTitleAbstractBody.PARAM_KEEP_FLOATING_BOXES, "false"));
-		}
+		builder.add(AnalysisEngineFactory.createPrimitiveDescription(TagPassagesAnnotator.class,
+				TagPassagesAnnotator.PARAM_OUT_DIR_PATH, options.outDir.getPath()));
 		
+//		builder.add(AnalysisEngineFactory.createPrimitiveDescription(TagPassagesAnnotator.class,
+//				TagPassagesAnnotator.PARAM_OUT_DIR_PATH, options.outDir.getPath(),
+//				TagPassagesAnnotator.PARAM_PYTHON_EXEC_PATH, options.execPath));
 		
-		if (options.clauseLevel ) 
-			if( options.ann2Ext != null) 			
-				builder.add(AnalysisEngineFactory.createPrimitiveDescription(SaveExtractedAnnotations.class,
-						SaveExtractedAnnotations.PARAM_DIR_PATH, options.outDir.getPath(),
-						SaveExtractedAnnotations.PARAM_KEEP_FLOATING_BOXES, "false",
-						SaveExtractedAnnotations.PARAM_ANNOT_2_EXTRACT, options.ann2Ext,
-						SaveExtractedAnnotations.PARAM_ADD_FRIES_CODES, "true", 
-						SaveExtractedAnnotations.PARAM_CLAUSE_LEVEL, "true"));
-			else 
-				builder.add(AnalysisEngineFactory.createPrimitiveDescription(SaveExtractedAnnotations.class,
-						SaveExtractedAnnotations.PARAM_DIR_PATH, options.outDir.getPath(),
-						SaveExtractedAnnotations.PARAM_KEEP_FLOATING_BOXES, "false",
-						SaveExtractedAnnotations.PARAM_ADD_FRIES_CODES, "true", 
-						SaveExtractedAnnotations.PARAM_CLAUSE_LEVEL, "true"));
-		else 
-			if( options.ann2Ext != null) 			
-				builder.add(AnalysisEngineFactory.createPrimitiveDescription(SaveExtractedAnnotations.class,
-						SaveExtractedAnnotations.PARAM_DIR_PATH, options.outDir.getPath(),
-						SaveExtractedAnnotations.PARAM_ANNOT_2_EXTRACT, options.ann2Ext,
-						SaveExtractedAnnotations.PARAM_KEEP_FLOATING_BOXES, "false",
-						SaveExtractedAnnotations.PARAM_ADD_FRIES_CODES, "true", 
-						SaveExtractedAnnotations.PARAM_CLAUSE_LEVEL, "false"));
-			else 
-				builder.add(AnalysisEngineFactory.createPrimitiveDescription(SaveExtractedAnnotations.class,
-						SaveExtractedAnnotations.PARAM_DIR_PATH, options.outDir.getPath(),
-						SaveExtractedAnnotations.PARAM_KEEP_FLOATING_BOXES, "false",
-						SaveExtractedAnnotations.PARAM_ADD_FRIES_CODES, "true", 
-						SaveExtractedAnnotations.PARAM_CLAUSE_LEVEL, "false"));
-		
-	
 		cpeBuilder.setAnalysisEngine(builder.createAggregateDescription());
 
 		cpeBuilder.setMaxProcessingUnitThreatCount(options.nThreads);

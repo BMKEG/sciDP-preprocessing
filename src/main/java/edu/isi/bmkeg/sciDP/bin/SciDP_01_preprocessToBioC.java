@@ -18,30 +18,46 @@ import org.uimafit.factory.CollectionReaderFactory;
 import org.uimafit.factory.CpeBuilder;
 import org.uimafit.factory.TypeSystemDescriptionFactory;
 
+import edu.isi.bmkeg.sciDP.uima.ae.MatchReachAndNxmlText;
 import edu.isi.bmkeg.uimaBioC.uima.ae.FixSentencesFromHeadings;
-import edu.isi.bmkeg.uimaBioC.uima.ae.TagPassagesAnnotator;
+import edu.isi.bmkeg.uimaBioC.uima.ae.RemoveSentencesFromOtherSections;
+import edu.isi.bmkeg.uimaBioC.uima.ae.SeparateClauses;
+import edu.isi.bmkeg.uimaBioC.uima.ae.StanfordParse;
+import edu.isi.bmkeg.uimaBioC.uima.out.SaveAsBioCDocuments;
 import edu.isi.bmkeg.uimaBioC.uima.readers.BioCCollectionReader;
 import edu.isi.bmkeg.uimaBioC.utils.StatusCallbackListenerImpl;
 
-public class RUBICON_03_prepareData {
+public class SciDP_01_preprocessToBioC {
 
 	public static class Options {
 
 		@Option(name = "-nThreads", usage = "Number of threads", required = true, metaVar = "IN-DIRECTORY")
 		public int nThreads;
 
+		@Option(name = "-maxSentenceLength", usage = "Maximum length of sentences to be parsed", required = false, metaVar = "MAX-PARSE-LENGTH")
+		public int maxSentenceLength;
+
 		@Option(name = "-biocDir", usage = "Input Directory", required = true, metaVar = "IN-DIRECTORY")
 		public File biocDir;
+
+		@Option(name = "-friesDir", usage = "Fries Directory", required = false, metaVar = "FRIES-DATA")
+		public File friesDir;
+
+		@Option(name = "-ann2Extract", usage = "Annotation Type to Extract", required = false, metaVar = "ANNOTATION")
+		public File ann2Ext;
 
 		@Option(name = "-outDir", usage = "Output Directory", required = true, metaVar = "OUT-FILE")
 		public File outDir;
 
-		//@Option(name = "-execPath", usage = "Path to the python executable", required = true, metaVar = "PATH")
-		//public String execPath;
+		@Option(name = "-outFormat", usage = "Output Format", required = true, metaVar = "OUT-FORMAT")
+		public String outFormat;
 		
+		@Option(name = "-clauseLevel", usage = "Output Directory", required = false, metaVar = "CLAUSE-LEVEL")
+		public Boolean clauseLevel = false;
+
 	}
 
-	private static Logger logger = Logger.getLogger(RUBICON_03_prepareData.class);
+	private static Logger logger = Logger.getLogger(SciDP_01_preprocessToBioC.class);
 
 	/**
 	 * @param args
@@ -83,22 +99,61 @@ public class RUBICON_03_prepareData {
 		AggregateBuilder builder = new AggregateBuilder();
 
 		builder.add(SentenceAnnotator.getDescription()); // Sentence
-		builder.add(TokenAnnotator.getDescription()); // Tokenization
+		
+		builder.add(AnalysisEngineFactory.createPrimitiveDescription(TokenAnnotator.class,
+				TokenAnnotator.PARAM_TOKENIZER_NAME, 
+				"edu.isi.bmkeg.uimaBioC.uima.ae.PennTreebankTokenizer")); // Tokenization
 
 		//
 		// Some sentences include headers that don't end in periods
 		//
 		builder.add(AnalysisEngineFactory.createPrimitiveDescription(FixSentencesFromHeadings.class));
 
+		//builder.add(AnalysisEngineFactory.createPrimitiveDescription(RemoveSentencesNotInTitleAbstractBody.class,
+		//		RemoveSentencesNotInTitleAbstractBody.PARAM_KEEP_FLOATING_BOXES, "true"));
+
+		if (options.friesDir != null) {
+			//builder.add(AnalysisEngineFactory.createPrimitiveDescription(AddReachAnnotations.class,
+			//		AddReachAnnotations.PARAM_INPUT_DIRECTORY, options.friesDir.getPath()));
+			builder.add(AnalysisEngineFactory.createPrimitiveDescription(MatchReachAndNxmlText.class,
+					MatchReachAndNxmlText.PARAM_INPUT_DIRECTORY, options.friesDir.getPath()));
+		}
+
 		//
-		// Execute Pradeep's Python code. 
+		// Strip out not results sections where we aren't interested in them
 		//
-		builder.add(AnalysisEngineFactory.createPrimitiveDescription(TagPassagesAnnotator.class,
-				TagPassagesAnnotator.PARAM_OUT_DIR_PATH, options.outDir.getPath()));
+		if( options.ann2Ext != null ) {
+			builder.add(AnalysisEngineFactory.createPrimitiveDescription(RemoveSentencesFromOtherSections.class,
+					RemoveSentencesFromOtherSections.PARAM_ANNOT_2_EXTRACT, options.ann2Ext,
+					RemoveSentencesFromOtherSections.PARAM_KEEP_FLOATING_BOXES, "true"));
+		} 
 		
-//		builder.add(AnalysisEngineFactory.createPrimitiveDescription(TagPassagesAnnotator.class,
-//				TagPassagesAnnotator.PARAM_OUT_DIR_PATH, options.outDir.getPath(),
-//				TagPassagesAnnotator.PARAM_PYTHON_EXEC_PATH, options.execPath));
+		builder.add(AnalysisEngineFactory.createPrimitiveDescription(StanfordParse.class,
+				StanfordParse.PARAM_MAX_LENGTH, options.maxSentenceLength));
+		//builder.add(AnalysisEngineFactory.createPrimitiveDescription(StanfordTag.class));
+
+		if (options.clauseLevel) {
+			
+			//
+			// Run Pradeep's system to create clauses from the text
+			//
+			builder.add(AnalysisEngineFactory.createPrimitiveDescription(SeparateClauses.class));
+		}
+
+		String outFormat = null;
+		if( options.outFormat.toLowerCase().equals("xml") ) 
+			outFormat = SaveAsBioCDocuments.XML;
+		else if( options.outFormat.toLowerCase().equals("json") ) 
+			outFormat = SaveAsBioCDocuments.JSON;
+		else 
+			throw new Exception("Output format " + options.outFormat + " not recognized");
+
+		builder.add(AnalysisEngineFactory.createPrimitiveDescription(
+				SaveAsBioCDocuments.class, 
+				SaveAsBioCDocuments.PARAM_FILE_PATH,
+				options.outDir.getPath(),
+				SaveAsBioCDocuments.PARAM_FORMAT,
+				outFormat));
 		
 		cpeBuilder.setAnalysisEngine(builder.createAggregateDescription());
 
