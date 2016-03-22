@@ -18,8 +18,8 @@ LIB_DIR=$PWD/target
 # SET THESE ELEMENTS HERE AND UNCOMMENT THE FOLLOWING WHEN RUNNING THIS SCRIPT 
 #
 # 1. git clone https://github.com/spyysalo/nxml2txt
-NXML2TXT_PATH=/path/to/locally/installed/nxml2txt
-#NXML2TXT_PATH=/Users/Gully/Coding/pyDev-workspace/nxml2txt/nxml2txt.py
+#NXML2TXT_PATH=/path/to/locally/installed/nxml2txt
+#NXML2TXT_PATH=/Users/Gully/Coding/pyDev-workspace/nxml2txt/nxml2txt
 
 # COMMENT OUT THIS SECTION TO RUN THIS SCRIPT 
 echo "PLEASE EDIT THIS runPipeline.sh SCRIPT TO SET PATHS TO NXML2TXT"
